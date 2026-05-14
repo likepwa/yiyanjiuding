@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>一言就顶</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "PingFang SC", "Microsoft Yahei", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #12141c;
+            padding-bottom: 120px;
+        }
+
+        .header {
+            padding: 24px 16px 14px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 26px;
+            color: #e6e8f0;
+            font-weight: 600;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+        .header p {
+            font-size: 13px;
+            color: #8a8e9b;
+            line-height: 1.6;
+        }
+
+        .rank-container {
+            padding: 0 12px;
+        }
+        .rank-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* 基础卡片样式 */
+        .card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        }
+
+        /* 第一名 金色光晕背景 */
+        .card-gold {
+            background: linear-gradient(135deg, rgba(255,215,0,0.25) 0%, rgba(255,180,0,0.15) 100%);
+            border: 2px solid rgba(255,215,0,0.7);
+            box-shadow: 0 0 30px rgba(255,215,0,0.4), 0 4px 20px rgba(0,0,0,0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        .card-gold::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 20%, rgba(255,215,0,0.3) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .card-gold .content {
+            color: #ffd700;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+        .card-gold .card-sign {
+            color: #e6c200;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 第二名 银色光晕背景 */
+        .card-silver {
+            background: linear-gradient(135deg, rgba(192,192,192,0.25) 0%, rgba(160,160,160,0.15) 100%);
+            border: 2px solid rgba(192,192,192,0.7);
+            box-shadow: 0 0 25px rgba(192,192,192,0.35), 0 4px 20px rgba(0,0,0,0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        .card-silver::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 20%, rgba(192,192,192,0.3) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .card-silver .content {
+            color: #e0e0e0;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+        .card-silver .card-sign {
+            color: #c0c0c0;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 第三名 铜色光晕背景 */
+        .card-bronze {
+            background: linear-gradient(135deg, rgba(205,127,50,0.25) 0%, rgba(170,100,40,0.15) 100%);
+            border: 2px solid rgba(205,127,50,0.7);
+            box-shadow: 0 0 25px rgba(205,127,50,0.35), 0 4px 20px rgba(0,0,0,0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        .card-bronze::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 20%, rgba(205,127,50,0.3) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .card-bronze .content {
+            color: #8a8e9b;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+        .card-bronze .card-sign {
+            color: #8a8e9b;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 4-50名 普通槽点 */
+        .card-normal {
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .card-normal .content {
+            color: #8a8e9b;
+        }
+
+        /* 50名后 拥挤压缩效果 背景更暗 */
+        .card-crowded {
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 12px 14px;
+            border-radius: 12px;
+            opacity: 0.65;
+            background: rgba(255,255,255,0.03);
+        }
+        .card-crowded .content {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #8a8e9b;
+            margin-bottom: 8px;
+        }
+        .card-crowded .card-sign {
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+        .card-crowded .vote-btn {
+            height: 32px;
+            font-size: 12px;
+        }
+
+        .content {
+            font-size: 15px;
+            line-height: 1.75;
+            color: #d8dbe8;
+            margin-bottom: 12px;
+        }
+        .card-sign {
+            text-align: right;
+            font-size: 12px;
+            color: #8a8e9b;
+            margin-bottom: 16px;
+        }
+
+        .vote-row {
+            display: flex;
+            gap: 10px;
+        }
+        .vote-btn {
+            flex: 1;
+            height: 38px;
+            border-radius: 10px;
+            border: none;
+            background: rgba(255,255,255,0.08);
+            color: #b0b6c4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .vote-btn:hover {
+            background: rgba(255,255,255,0.12);
+        }
+        .vote-btn.active {
+            background: rgba(64,86,142,0.3);
+        }
+
+        .comment-wrap {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: none;
+        }
+        .comment-wrap.show {
+            display: block;
+        }
+
+        .comment-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #b0b6c4;
+            line-height: 1.6;
+        }
+        .comment-forbid {
+            color: #a87878;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .comment-vote {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #8a8e9b;
+        }
+        .comment-vote span {
+            cursor: pointer;
+        }
+
+        .comment-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .comment-input-row input {
+            flex: 1;
+            height: 38px;
+            padding: 0 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            color: #d8dbe8;
+            font-size: 14px;
+            outline: none;
+        }
+        .comment-input-row button {
+            height: 38px;
+            padding: 0 18px;
+            background: #40568e;
+            color: #e6e8f0;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 32px;
+            right: 20px;
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: #40568e;
+            color: #fff;
+            font-size: 26px;
+            border: none;
+            box-shadow: 0 0 18px rgba(64,86,142,0.45);
+            z-index: 999;
+            animation: breathe 3s ease-in-out infinite;
+        }
+        @keyframes breathe {
+            0%,100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.75);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-box {
+            background: #1a1c28;
+            width: 100%;
+            border-radius: 20px;
+            padding: 22px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-title {
+            font-size: 17px;
+            color: #e6e8f0;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+        .modal-textarea {
+            width: 100%;
+            height: 110px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            padding: 14px;
+            font-size: 15px;
+            background: rgba(255,255,255,0.05);
+            color: #d8dbe8;
+            resize: none;
+            outline: none;
+            margin-bottom: 8px;
+        }
+        .sign-input {
+            width: 100%;
+            height: 42px;
+            padding: 0 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            color: #d8dbe8;
+            font-size: 14px;
+            outline: none;
+            margin-bottom: 8px;
+        }
+        .count-tip {
+            text-align: right;
+            font-size: 12px;
+            color: #8a8e9b;
+            margin-bottom: 12px;
+        }
+        .count-tip.warn {
+            color: #e08080;
+        }
+        .modal-btns {
+            display: flex;
+            gap: 12px;
+        }
+        .btn {
+            flex: 1;
+            height: 46px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+        }
+        .btn-cancel {
+            background: rgba(255,255,255,0.08);
+            color: #b0b6c4;
+        }
+        .btn-submit {
+            background: #40568e;
+            color: #fff;
+        }
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .item-hide {
+            display: none !important;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8a8e9b;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>一言就顶</h1>
+        <p>请随意吐槽，要上头条点 👍，要拉人下榜点 👎</p>
+    </div>
+
+    <div class="rank-container">
+        <div class="rank-list" id="rankList">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <button class="fab" id="openModal">+</button>
+
+    <div class="modal" id="modal">
+        <div class="modal-box">
+            <div class="modal-title">说句话 顶上去</div>
+            <textarea class="modal-textarea" id="postText" placeholder=""></textarea>
+            <input class="sign-input" id="signText" placeholder="请签名" maxlength="6">
+            <div class="count-tip" id="postCount">0 / 120（15-120字）</div>
+            <div class="modal-btns">
+                <button class="btn btn-cancel" id="closeModal">取消</button>
+                <button class="btn btn-submit" id="submitPost">发布上榜</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================== 配置区域（替换成你自己的Supabase信息）=====================
+        const SUPABASE_URL = 'https://hlkudwvzrkmdkidxuia.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_L2oaE67FWmUre9aVSOydnQ_gaSragbT
+';
+        // =================================================================================
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 字数规则
+        const POST_MIN = 15;
+        const POST_MAX = 120;
+        const SIGN_MAX = 6;
+        const COMMENT_MIN = 6;
+        const COMMENT_MAX = 60;
+
+        // 阈值配置（后续从数据库读取）
+        const POST_DOWN_HIDE = 30;
+        const COMMENT_DOWN_HIDE = 20;
+        const RANK_NORMAL_BOUND = 50;
+
+        // DOM元素
+        const modal = document.getElementById('modal');
+        const openModal = document.getElementById('openModal');
+        const closeModal = document.getElementById('closeModal');
+        const postText = document.getElementById('postText');
+        const signText = document.getElementById('signText');
+        const postCount = document.getElementById('postCount');
+        const submitPost = document.getElementById('submitPost');
+        const rankList = document.getElementById('rankList');
+
+        // 初始化
+        init();
+
+        function init() {
+            loadPosts();
+            bindEvents();
+        }
+
+        // 加载槽点列表
+        async function loadPosts() {
+            const { data, error } = await supabase
+                .from('posts')
+                .select('*, comments(count)')
+                .eq('status', 1)
+                .order('upvotes', { ascending: false })
+                .limit(100);
+
+            if (error) {
+                rankList.innerHTML = '<div class="loading">加载失败，请刷新重试</div>';
+                return;
+            }
+
+            rankList.innerHTML = '';
+            data.forEach((post, index) => {
+                if (post.downvotes >= POST_DOWN_HIDE) return;
+                
+                const cardClass = getCardClass(index);
+                const card = createPostCard(post, cardClass, index);
+                rankList.appendChild(card);
+            });
+
+            // 绑定评论展开事件
+            document.querySelectorAll('.reply-btn').forEach(btn => {
+                btn.onclick = function() {
+                    const wrap = this.closest('.card').querySelector('.comment-wrap');
+                    wrap.classList.toggle('show');
+                    if (wrap.classList.contains('show')) {
+                        loadComments(this.closest('.card').dataset.postId);
+                    }
+                };
+            });
+
+            // 绑定点赞点踩事件
+            document.querySelectorAll('.vote-btn').forEach(btn => {
+                if (btn.classList.contains('reply-btn')) return;
+                btn.onclick = async function() {
+                    const postId = this.closest('.card').dataset.postId;
+                    const voteType = this.textContent.includes('👍') ? 'up' : 'down';
+                    await votePost(postId, voteType);
+                };
+            });
+        }
+
+        // 获取卡片样式类
+        function getCardClass(index) {
+            if (index === 0) return 'card-gold';
+            if (index === 1) return 'card-silver';
+            if (index === 2) return 'card-bronze';
+            if (index < RANK_NORMAL_BOUND) return 'card-normal';
+            return 'card-crowded';
+        }
+
+        // 创建槽点卡片
+        function createPostCard(post, cardClass, index) {
+            const card = document.createElement('div');
+            card.className = `card ${cardClass}`;
+            card.dataset.postId = post.id;
+            
+            card.innerHTML = `
+                <div class="content">${escapeHtml(post.content)}</div>
+                <div class="card-sign">${escapeHtml(post.signature)}</div>
+                <div class="vote-row">
+                    <div class="vote-btn">👍 ${post.upvotes}</div>
+                    <div class="vote-btn">👎 ${post.downvotes}</div>
+                    <div class="vote-btn reply-btn">💬 回复 (${post.comments[0].count})</div>
+                </div>
+                <div class="comment-wrap">
+                    <div class="comment-list"></div>
+                    <div class="comment-input-row">
+                        <input type="text" placeholder="写下你的看法（6-60字）" class="comment-input">
+                        <button class="comment-submit">发送</button>
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // 加载评论
+        async function loadComments(postId) {
+            const commentList = document.querySelector(`.card[data-post-id="${postId}"] .comment-list`);
+            commentList.innerHTML = '<div style="text-align:center;padding:10px;color:#8a8e9b;">加载中...</div>';
+
+            const { data, error } = await supabase
+                .from('comments')
+                .select('*')
+                .eq('post_id', postId)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                commentList.innerHTML = '<div style="text-align:center;padding:10px;color:#8a8e9b;">评论加载失败</div>';
+                return;
+            }
+
+            commentList.innerHTML = '';
+            data.forEach(comment => {
+                const commentItem = document.createElement('div');
+                commentItem.className = `comment-item ${comment.downvotes >= COMMENT_DOWN_HIDE ? 'comment-forbid' : ''}`;
+                
+                if (comment.downvotes >= COMMENT_DOWN_HIDE) {
+                    commentItem.innerHTML = `
+                        有伤天和，被判关小黑屋一万年
+                        <div class="comment-vote">
+                            <span>👍 ${comment.upvotes}</span>
+                            <span>👎 ${comment.downvotes}</span>
+                        </div>
+                    `;
+                } else {
+                    commentItem.innerHTML = `
+                        ${escapeHtml(comment.content)}
+                        <div class="comment-vote">
+                            <span class="comment-upvote" data-comment-id="${comment.id}">👍 ${comment.upvotes}</span>
+                            <span class="comment-downvote" data-comment-id="${comment.id}">👎 ${comment.downvotes}</span>
+                        </div>
+                    `;
+                }
+                
+                commentList.appendChild(commentItem);
+            });
+
+            // 绑定评论提交事件
+            const submitBtn = document.querySelector(`.card[data-post-id="${postId}"] .comment-submit`);
+            const input = document.querySelector(`.card[data-post-id="${postId}"] .comment-input`);
+            
+            submitBtn.onclick = async () => {
+                const content = input.value.trim();
+                if (content.length < COMMENT_MIN || content.length > COMMENT_MAX) {
+                    alert(`评论需要${COMMENT_MIN}-${COMMENT_MAX}字`);
+                    return;
+                }
+                await submitComment(postId, content);
+                input.value = '';
+                loadComments(postId);
+            };
+
+            // 绑定评论点赞点踩事件
+            document.querySelectorAll('.comment-upvote, .comment-downvote').forEach(span => {
+                span.onclick = async function() {
+                    const commentId = this.dataset.commentId;
+                    const voteType = this.classList.contains('comment-upvote') ? 'up' : 'down';
+                    await voteComment(commentId, voteType);
+                    loadComments(postId);
+                };
+            });
+        }
+
+        // 发布槽点
+        async function submitPost() {
+            const content = postText.value.trim();
+            const signature = signText.value.trim() || '匿名';
+
+            if (content.length < POST_MIN || content.length > POST_MAX) {
+                alert(`槽点需要${POST_MIN}-${POST_MAX}字`);
+                return;
+            }
+
+            submitPost.disabled = true;
+            submitPost.textContent = '发布中...';
+
+            const { error } = await supabase
+                .from('posts')
+                .insert([{ content, signature }]);
+
+            if (error) {
+                alert('发布失败，请重试');
+                submitPost.disabled = false;
+                submitPost.textContent = '发布上榜';
+                return;
+            }
+
+            modal.classList.remove('show');
+            submitPost.disabled = false;
+            submitPost.textContent = '发布上榜';
+            loadPosts();
+        }
+
+        // 槽点点赞/点踩
+        async function votePost(postId, voteType) {
+            const field = voteType === 'up' ? 'upvotes' : 'downvotes';
+            
+            await supabase
+                .from('posts')
+                .update({ [field]: supabase.raw(`${field} + 1`) })
+                .eq('id', postId);
+
+            loadPosts();
+        }
+
+        // 提交评论
+        async function submitComment(postId, content) {
+            await supabase
+                .from('comments')
+                .insert([{ post_id: postId, content }]);
+        }
+
+        // 评论点赞/点踩
+        async function voteComment(commentId, voteType) {
+            const field = voteType === 'up' ? 'upvotes' : 'downvotes';
+            
+            await supabase
+                .from('comments')
+                .update({ [field]: supabase.raw(`${field} + 1`) })
+                .eq('id', commentId);
+        }
+
+        // 绑定事件
+        function bindEvents() {
+            openModal.onclick = () => {
+                modal.classList.add('show');
+                postText.value = '';
+                signText.value = '';
+                checkPostCount();
+            };
+
+            closeModal.onclick = () => {
+                modal.classList.remove('show');
+            };
+
+            postText.addEventListener('input', checkPostCount);
+            submitPost.onclick = submitPost;
+        }
+
+        // 检查字数
+        function checkPostCount() {
+            const len = postText.value.length;
+            postCount.innerText = `${len} / ${POST_MAX}（${POST_MIN}-${POST_MAX}字）`;
+            
+            if (len < POST_MIN || len > POST_MAX) {
+                postCount.classList.add('warn');
+                submitPost.disabled = true;
+            } else {
+                postCount.classList.remove('warn');
+                submitPost.disabled = false;
+            }
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一言就顶 - 管理后台</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "PingFang SC", "Microsoft Yahei", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #12141c;
+            color: #d8dbe8;
+            min-height: 100vh;
+        }
+
+        /* 登录页面 */
+        .login-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-box {
+            background: rgba(255,255,255,0.06);
+            border-radius: 18px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .login-title {
+            text-align: center;
+            font-size: 22px;
+            margin-bottom: 24px;
+            color: #e6e8f0;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #b0b6c4;
+        }
+        .form-group input {
+            width: 100%;
+            height: 42px;
+            padding: 0 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            color: #d8dbe8;
+            font-size: 14px;
+            outline: none;
+        }
+        .login-btn {
+            width: 100%;
+            height: 46px;
+            border-radius: 12px;
+            border: none;
+            background: #40568e;
+            color: #fff;
+            font-size: 15px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .error-tip {
+            color: #e08080;
+            text-align: center;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+
+        /* 后台主页面 */
+        .admin-page {
+            display: none;
+        }
+        .admin-header {
+            background: rgba(255,255,255,0.06);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .admin-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .logout-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255,255,255,0.08);
+            color: #b0b6c4;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .admin-container {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+        .sidebar {
+            width: 200px;
+            background: rgba(255,255,255,0.03);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 20px 0;
+        }
+        .sidebar-menu {
+            list-style: none;
+        }
+        .sidebar-menu li {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #b0b6c4;
+            transition: all 0.2s ease;
+        }
+        .sidebar-menu li:hover, .sidebar-menu li.active {
+            background: rgba(255,255,255,0.08);
+            color: #e6e8f0;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .page-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #e6e8f0;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .card-title {
+            font-size: 16px;
+            margin-bottom: 16px;
+            color: #e6e8f0;
+        }
+
+        /* 配置项样式 */
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .config-item:last-child {
+            border-bottom: none;
+        }
+        .config-label {
+            font-size: 14px;
+        }
+        .config-desc {
+            font-size: 12px;
+            color: #8a8e9b;
+            margin-top: 4px;
+        }
+        .config-input {
+            width: 120px;
+            height: 36px;
+            padding: 0 12px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            color: #d8dbe8;
+            font-size: 14px;
+            text-align: right;
+            outline: none;
+        }
+        .save-btn {
+            padding: 8px 20px;
+            border-radius: 8px;
+            border: none;
+            background: #40568e;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        /* 开关样式 */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255,255,255,0.1);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #40568e;
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* 列表样式 */
+        .list-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .list-table th, .list-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px;
+        }
+        .list-table th {
+            color: #b0b6c4;
+            font-weight: 500;
+        }
+        .action-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        .btn-hide {
+            background: rgba(224,128,128,0.2);
+            color: #e08080;
+        }
+        .btn-show {
+            background: rgba(128,224,128,0.2);
+            color: #80e080;
+        }
+        .btn-delete {
+            background: rgba(224,64,64,0.2);
+            color: #e04040;
+        }
+
+        .empty-tip {
+            text-align: center;
+            padding: 40px;
+            color: #8a8e9b;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div class="login-page" id="loginPage">
+        <div class="login-box">
+            <div class="login-title">一言就顶 管理后台</div>
+            <div class="form-group">
+                <label>管理员邮箱</label>
+                <input type="email" id="adminEmail" placeholder="请输入管理员邮箱">
+            </div>
+            <div class="form-group">
+                <label>管理员密码</label>
+                <input type="password" id="adminPassword" placeholder="请输入管理员密码">
+            </div>
+            <button class="login-btn" id="loginBtn">登录</button>
+            <div class="error-tip" id="errorTip"></div>
+        </div>
+    </div>
+
+    <!-- 后台主页面 -->
+    <div class="admin-page" id="adminPage">
+        <div class="admin-header">
+            <div class="admin-title">一言就顶 管理后台</div>
+            <button class="logout-btn" id="logoutBtn">退出登录</button>
+        </div>
+
+        <div class="admin-container">
+            <ul class="sidebar-menu" id="sidebarMenu">
+                <li data-page="config" class="active">系统配置</li>
+                <li data-page="features">功能开关</li>
+                <li data-page="topics">分类管理</li>
+                <li data-page="posts">槽点管理</li>
+                <li data-page="comments">评论管理</li>
+                <li data-page="reports">举报管理</li>
+            </ul>
+
+            <div class="main-content" id="mainContent">
+                <!-- 内容由JS动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================== 配置区域（替换成你自己的Supabase信息）=====================
+        const SUPABASE_URL = 'https://hlkudwvzrkmdkidxuia.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_L2oaE67FWmUre9aVSOydnQ_gaSragbT';
+        // =================================================================================
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 页面初始化
+        init();
+
+        async function init() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                showAdminPage();
+            } else {
+                showLoginPage();
+            }
+            bindEvents();
+        }
+
+        // 显示登录页面
+        function showLoginPage() {
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('adminPage').style.display = 'none';
+        }
+
+        // 显示后台页面
+        function showAdminPage() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('adminPage').style.display = 'block';
+            loadPage('config');
+        }
+
+        // 绑定事件
+        function bindEvents() {
+            // 登录
+            document.getElementById('loginBtn').onclick = async () => {
+                const email = document.getElementById('adminEmail').value.trim();
+                const password = document.getElementById('adminPassword').value.trim();
+                
+                if (!email || !password) {
+                    showError('请输入邮箱和密码');
+                    return;
+                }
+
+                document.getElementById('loginBtn').disabled = true;
+                document.getElementById('loginBtn').textContent = '登录中...';
+
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                
+                if (error) {
+                    showError(error.message);
+                    document.getElementById('loginBtn').disabled = false;
+                    document.getElementById('loginBtn').textContent = '登录';
+                    return;
+                }
+
+                showAdminPage();
+            };
+
+            // 退出登录
+            document.getElementById('logoutBtn').onclick = async () => {
+                await supabase.auth.signOut();
+                showLoginPage();
+            };
+
+            // 侧边栏菜单切换
+            document.querySelectorAll('#sidebarMenu li').forEach(li => {
+                li.onclick = function() {
+                    document.querySelectorAll('#sidebarMenu li').forEach(item => item.classList.remove('active'));
+                    this.classList.add('active');
+                    loadPage(this.dataset.page);
+                };
+            });
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const errorTip = document.getElementById('errorTip');
+            errorTip.textContent = message;
+            setTimeout(() => errorTip.textContent = '', 3000);
+        }
+
+        // 加载页面
+        async function loadPage(page) {
+            const mainContent = document.getElementById('mainContent');
+            
+            switch(page) {
+                case 'config':
+                    await loadConfigPage();
+                    break;
+                case 'features':
+                    await loadFeaturesPage();
+                    break;
+                case 'topics':
+                    await loadTopicsPage();
+                    break;
+                case 'posts':
+                    await loadPostsPage();
+                    break;
+                case 'comments':
+                    await loadCommentsPage();
+                    break;
+                case 'reports':
+                    loadReportsPage();
+                    break;
+            }
+        }
+
+        // 加载系统配置页面
+        async function loadConfigPage() {
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = '<div class="page-title">系统配置</div><div class="card"><div class="card-title">阈值设置</div><div id="configList"></div><button class="save-btn" id="saveConfigBtn">保存配置</button></div>';
+
+            const { data, error } = await supabase
+                .from('sys_config')
+                .select('*')
+                .order('id');
+
+            if (error) {
+                mainContent.innerHTML += '<div class="empty-tip">加载配置失败</div>';
+                return;
+            }
+
+            const configList = document.getElementById('configList');
+            data.forEach(config => {
+                const item = document.createElement('div');
+                item.className = 'config-item';
+                item.innerHTML = `
+                    <div>
+                        <div class="config-label">${config.config_key}</div>
+                        <div class="config-desc">${config.config_desc}</div>
+                    </div>
+                    <input type="text" class="config-input" data-key="${config.config_key}" value="${config.config_value}">
+                `;
+                configList.appendChild(item);
+            });
+
+            // 保存配置
+            document.getElementById('saveConfigBtn').onclick = async () => {
+                const inputs = document.querySelectorAll('.config-input');
+                for (const input of inputs) {
+                    await supabase
+                        .from('sys_config')
+                        .update({ config_value: input.value.trim() })
+                        .eq('config_key', input.dataset.key);
+                }
+                alert('配置保存成功！');
+            };
+        }
+
+        // 加载功能开关页面
+        async function loadFeaturesPage() {
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = '<div class="page-title">功能开关</div><div class="card"><div class="card-title">功能控制（修改后前端刷新生效）</div><div id="featuresList"></div><button class="save-btn" id="saveFeaturesBtn">保存设置</button></div>';
+
+            const features = [
+                { key: 'enableReport', name: '举报功能', desc: '开启后用户可以举报违规内容' },
+                { key: 'enableSearch', name: '搜索功能', desc: '开启后顶部显示搜索框' },
+                { key: 'enableTopic', name: '话题分类', desc: '开启后顶部显示话题标签栏' },
+                { key: 'enableShare', name: '分享功能', desc: '开启后显示分享按钮' },
+                { key: 'enableHotTag', name: '热门标签', desc: '开启后热门槽点显示热门标签' }
+            ];
+
+            const { data } = await supabase
+                .from('sys_config')
+                .select('config_key, config_value')
+                .in('config_key', features.map(f => f.key));
+
+            const featureStatus = {};
+            data.forEach(item => {
+                featureStatus[item.config_key] = item.config_value === 'true';
+            });
+
+            // 插入默认值
+            for (const feature of features) {
+                if (!(feature.key in featureStatus)) {
+                    featureStatus[feature.key] = false;
+                    await supabase
+                        .from('sys_config')
+                        .insert([{ 
+                            config_key: feature.key, 
+                            config_value: 'false', 
+                            config_desc: feature.desc 
+                        }]);
+                }
+            }
+
+            const featuresList = document.getElementById('featuresList');
+            features.forEach(feature => {
+                const item = document.createElement('div');
+                item.className = 'config-item';
+                item.innerHTML = `
+                    <div>
+                        <div class="config-label">${feature.name}</div>
+                        <div class="config-desc">${feature.desc}</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" data-key="${feature.key}" ${featureStatus[feature.key] ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                `;
+                featuresList.appendChild(item);
+            });
+
+            // 保存功能开关
+            document.getElementById('saveFeaturesBtn').onclick = async () => {
+                const checkboxes = document.querySelectorAll('.switch input');
+                for (const checkbox of checkboxes) {
+                    await supabase
+                        .from('sys_config')
+                        .update({ config_value: checkbox.checked ? 'true' : 'false' })
+                        .eq('config_key', checkbox.dataset.key);
+                }
+                alert('功能设置保存成功！请刷新前端页面生效');
+            };
+        }
+
+        // 加载分类管理页面
+        async function loadTopicsPage() {
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = '<div class="page-title">分类管理</div><div class="card"><div class="card-title">分类列表</div><table class="list-table"><thead><tr><th>ID</th><th>分类名称</th><th>排序</th><th>操作</th></tr></thead><tbody id="topicsList"></tbody></table><button class="save-btn" id="addTopicBtn" style="margin-top:16px;">添加分类</button></div>';
+
+            const { data, error } = await supabase
+                .from('topics')
+                .select('*')
+                .order('sort');
+
+            if (error || data.length === 0) {
+                document.getElementById('topicsList').innerHTML = '<tr><td colspan="4" class="empty-tip">暂无分类数据</td></tr>';
+            } else {
+                const topicsList = document.getElementById('topicsList');
+                data.forEach(topic => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${topic.id}</td>
+                        <td><input type="text" class="config-input" data-id="${topic.id}" data-field="topic_name" value="${escapeHtml(topic.topic_name)}" style="width:150px;text-align:left;"></td>
+                        <td><input type="text" class="config-input" data-id="${topic.id}" data-field="sort" value="${topic.sort}" style="width:80px;"></td>
+                        <td>
+                            <button class="action-btn btn-delete" data-id="${topic.id}">删除</button>
+                        </td>
+                    `;
+                    topicsList.appendChild(tr);
+                });
+
+                // 绑定保存事件
+                document.querySelectorAll('.config-input').forEach(input => {
+                    input.onblur = async function() {
+                        const id = this.dataset.id;
+                        const field = this.dataset.field;
+                        const value = this.value.trim();
+                        await supabase
+                            .from('topics')
+                            .update({ [field]: value })
+                            .eq('id', id);
+                    };
+                });
+
+                // 绑定删除事件
+                document.querySelectorAll('.btn-delete').forEach(btn => {
+                    btn.onclick = async function() {
+                        if (!confirm('确定要删除这个分类吗？')) return;
+                        await supabase
+                            .from('topics')
+                            .delete()
+                            .eq('id', this.dataset.id);
+                        loadTopicsPage();
+                    };
+                });
+            }
+
+            // 添加分类
+            document.getElementById('addTopicBtn').onclick = async () => {
+                const name = prompt('请输入分类名称：');
+                if (!name) return;
+                await supabase
+                    .from('topics')
+                    .insert([{ topic_name: name, sort: 99 }]);
+                loadTopicsPage();
+            };
+        }
+
+        // 加载槽点管理页面
+        async function loadPostsPage() {
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = '<div class="page-title">槽点管理</div><div class="card"><table class="list-table"><thead><tr><th>ID</th><th>内容</th><th>签名</th><th>点赞</th><th>点踩</th><th>状态</th><th>操作</th></tr></thead><tbody id="postsList"></tbody></table></div>';
+
+            const { data, error } = await supabase
+                .from('posts')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (error || data.length === 0) {
+                document.getElementById('postsList').innerHTML = '<tr><td colspan="7" class="empty-tip">暂无槽点数据</td></tr>';
+                return;
+            }
+
+            const postsList = document.getElementById('postsList');
+            data.forEach(post => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${post.id}</td>
+                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(post.content)}</td>
+                    <td>${escapeHtml(post.signature)}</td>
+                    <td>${post.upvotes}</td>
+                    <td>${post.downvotes}</td>
+                    <td>${post.status === 1 ? '正常' : '已隐藏'}</td>
+                    <td>
+                        ${post.status === 1 
+                            ? '<button class="action-btn btn-hide" data-id="' + post.id + '">隐藏</button>' 
+                            : '<button class="action-btn btn-show" data-id="' + post.id + '">显示</button>'}
+                        <button class="action-btn btn-delete" data-id="${post.id}">删除</button>
+                    </td>
+                `;
+                postsList.appendChild(tr);
+            });
+
+            // 绑定操作事件
+            document.querySelectorAll('.btn-hide, .btn-show').forEach(btn => {
+                btn.onclick = async function() {
+                    const postId = this.dataset.id;
+                    const newStatus = this.classList.contains('btn-hide') ? 2 : 1;
+                    await supabase
+                        .from('posts')
+                        .update({ status: newStatus })
+                        .eq('id', postId);
+                    loadPostsPage();
+                };
+            });
+
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.onclick = async function() {
+                    if (!confirm('确定要删除这条槽点吗？')) return;
+                    await supabase
+                        .from('posts')
+                        .delete()
+                        .eq('id', this.dataset.id);
+                    loadPostsPage();
+                };
+            });
+        }
+
+        // 加载评论管理页面
+        async function loadCommentsPage() {
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = '<div class="page-title">评论管理</div><div class="card"><table class="list-table"><thead><tr><th>ID</th><th>所属槽点ID</th><th>内容</th><th>点赞</th><th>点踩</th><th>操作</th></tr></thead><tbody id="commentsList"></tbody></table></div>';
+
+            const { data, error } = await supabase
+                .from('comments')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (error || data.length === 0) {
+                document.getElementById('commentsList').innerHTML = '<tr><td colspan="6" class="empty-tip">暂无评论数据</td></tr>';
+                return;
+            }
+
+            const commentsList = document.getElementById('commentsList');
+            data.forEach(comment => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${comment.id}</td>
+                    <td>${comment.post_id}</td>
+                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(comment.content)}</td>
+                    <td>${comment.upvotes}</td>
+                    <td>${comment.downvotes}</td>
+                    <td>
+                        <button class="action-btn btn-delete" data-id="${comment.id}">删除</button>
+                    </td>
+                `;
+                commentsList.appendChild(tr);
+            });
+
+            // 绑定删除事件
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.onclick = async function() {
+                    if (!confirm('确定要删除这条评论吗？')) return;
+                    await supabase
+                        .from('comments')
+                        .delete()
+                        .eq('id', this.dataset.id);
+                    loadCommentsPage();
+                };
+            });
+        }
+
+        // 加载举报管理页面
+        function loadReportsPage() {
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = '<div class="page-title">举报管理</div><div class="card"><div class="empty-tip">举报功能暂未开启，在「功能开关」中开启后即可使用</div></div>';
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
