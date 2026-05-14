@@ -81,218 +81,211 @@
         </div>
     </div>
     <script>
-        // ========== 请替换成你自己的 Supabase 配置 ==========
-        const SUPABASE_URL = 'https://hlkudwvzrkmdkidxuia.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_L2oaE67FWmUre9aVSOydnQ_gaSragbT';
-        // =================================================
+        (function(){
+            // ==================== 请替换成你自己的 Supabase 配置 ====================
+            const SUPABASE_URL = 'https://hlkudwvzrkmdkidxuia.supabase.co';
+            const SUPABASE_ANON_KEY = 'sb_publishable_L2oaE67FWmUre9aVSOydnQ_gaSragbT';
+            // =====================================================================
 
-        // 只声明一次 supabase 客户端
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 从系统配置读取阈值（也可以直接使用默认值）
-        const POST_MIN = 15, POST_MAX = 120;
-        const COMMENT_MIN = 6, COMMENT_MAX = 60;
-        const POST_DOWN_HIDE = 30, COMMENT_DOWN_HIDE = 20, RANK_NORMAL_BOUND = 50;
+            // 字数配置（与你的数据库 sys_config 保持一致）
+            const POST_MIN = 15, POST_MAX = 120;
+            const COMMENT_MIN = 6, COMMENT_MAX = 60;
+            const POST_DOWN_HIDE = 30, COMMENT_DOWN_HIDE = 20, RANK_NORMAL_BOUND = 50;
 
-        // DOM 元素
-        const modal = document.getElementById('modal');
-        const openModal = document.getElementById('openModal');
-        const closeModal = document.getElementById('closeModal');
-        const postText = document.getElementById('postText');
-        const signText = document.getElementById('signText');
-        const postCount = document.getElementById('postCount');
-        const submitPostBtn = document.getElementById('submitPostBtn');
-        const rankList = document.getElementById('rankList');
+            // DOM 元素
+            const modal = document.getElementById('modal');
+            const openModal = document.getElementById('openModal');
+            const closeModal = document.getElementById('closeModal');
+            const postText = document.getElementById('postText');
+            const signText = document.getElementById('signText');
+            const postCount = document.getElementById('postCount');
+            const submitBtn = document.getElementById('submitPostBtn');
+            const rankList = document.getElementById('rankList');
 
-        // 页面初始化
-        init();
-
-        function init() {
-            loadPosts();
-            bindEvents();
-        }
-
-        // 加载槽点列表
-        async function loadPosts() {
-            const { data, error } = await supabase
-                .from('posts')
-                .select('*, comments(count)')
-                .eq('status', 1)
-                .order('upvotes', { ascending: false })
-                .limit(100);
-
-            if (error) {
-                rankList.innerHTML = '<div class="loading">加载失败，请刷新重试</div>';
-                console.error('加载失败:', error);
-                return;
+            function escapeHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
             }
 
-            rankList.innerHTML = '';
-            data.forEach((post, index) => {
-                if (post.downvotes >= POST_DOWN_HIDE) return;
-                const cardClass = index===0 ? 'card-gold' : index===1 ? 'card-silver' : index===2 ? 'card-bronze' : (index < RANK_NORMAL_BOUND ? 'card-normal' : 'card-crowded');
-                const card = document.createElement('div');
-                card.className = `card ${cardClass}`;
-                card.dataset.postId = post.id;
-                const commentCount = (post.comments && post.comments[0]) ? post.comments[0].count : 0;
-                card.innerHTML = `
-                    <div class="content">${escapeHtml(post.content)}</div>
-                    <div class="card-sign">${escapeHtml(post.signature || '匿名')}</div>
-                    <div class="vote-row">
-                        <div class="vote-btn">👍 ${post.upvotes || 0}</div>
-                        <div class="vote-btn">👎 ${post.downvotes || 0}</div>
-                        <div class="vote-btn reply-btn">💬 回复 (${commentCount})</div>
-                    </div>
-                    <div class="comment-wrap">
-                        <div class="comment-list"></div>
-                        <div class="comment-input-row">
-                            <input type="text" placeholder="写下你的看法（6-60字）" class="comment-input">
-                            <button class="comment-submit">发送</button>
-                        </div>
-                    </div>
-                `;
-                rankList.appendChild(card);
-            });
+            async function loadPosts() {
+                const { data, error } = await supabase
+                    .from('posts')
+                    .select('*, comments(count)')
+                    .eq('status', 1)
+                    .order('upvotes', { ascending: false })
+                    .limit(100);
 
-            // 绑定评论展开事件
-            document.querySelectorAll('.reply-btn').forEach(btn => {
-                btn.onclick = function() {
-                    const wrap = this.closest('.card').querySelector('.comment-wrap');
-                    wrap.classList.toggle('show');
-                    if (wrap.classList.contains('show')) loadComments(this.closest('.card').dataset.postId);
-                };
-            });
-            // 绑定点赞点踩事件
-            document.querySelectorAll('.vote-btn').forEach(btn => {
-                if (btn.classList.contains('reply-btn')) return;
-                btn.onclick = async function() {
-                    const postId = this.closest('.card').dataset.postId;
-                    const voteType = this.textContent.includes('👍') ? 'up' : 'down';
-                    await votePost(postId, voteType);
-                };
-            });
-        }
-
-        // 加载评论
-        async function loadComments(postId) {
-            const commentList = document.querySelector(`.card[data-post-id="${postId}"] .comment-list`);
-            commentList.innerHTML = '<div style="text-align:center;padding:10px;color:#8a8e9b;">加载中...</div>';
-            const { data, error } = await supabase
-                .from('comments')
-                .select('*')
-                .eq('post_id', postId)
-                .order('created_at', { ascending: true });
-            if (error) {
-                commentList.innerHTML = '<div style="text-align:center;padding:10px;color:#8a8e9b;">评论加载失败</div>';
-                return;
-            }
-            commentList.innerHTML = '';
-            data.forEach(comment => {
-                const commentItem = document.createElement('div');
-                commentItem.className = `comment-item ${comment.downvotes >= COMMENT_DOWN_HIDE ? 'comment-forbid' : ''}`;
-                if (comment.downvotes >= COMMENT_DOWN_HIDE) {
-                    commentItem.innerHTML = `有伤天和，被判关小黑屋一万年<div class="comment-vote"><span>👍 ${comment.upvotes || 0}</span><span>👎 ${comment.downvotes || 0}</span></div>`;
-                } else {
-                    commentItem.innerHTML = `${escapeHtml(comment.content)}<div class="comment-vote"><span class="comment-upvote" data-comment-id="${comment.id}">👍 ${comment.upvotes || 0}</span><span class="comment-downvote" data-comment-id="${comment.id}">👎 ${comment.downvotes || 0}</span></div>`;
+                if (error) {
+                    rankList.innerHTML = '<div class="loading">加载失败，请刷新重试</div>';
+                    console.error(error);
+                    return;
                 }
-                commentList.appendChild(commentItem);
-            });
-            // 提交评论
-            const submitBtn = document.querySelector(`.card[data-post-id="${postId}"] .comment-submit`);
-            const input = document.querySelector(`.card[data-post-id="${postId}"] .comment-input`);
-            if (submitBtn) {
-                submitBtn.onclick = async () => {
-                    const content = input.value.trim();
-                    if (content.length < COMMENT_MIN || content.length > COMMENT_MAX) { alert(`评论需要${COMMENT_MIN}-${COMMENT_MAX}字`); return; }
-                    await supabase.from('comments').insert([{ post_id: postId, content, upvotes: 0, downvotes: 0 }]);
-                    input.value = '';
-                    loadComments(postId);
+
+                rankList.innerHTML = '';
+                data.forEach((post, idx) => {
+                    if (post.downvotes >= POST_DOWN_HIDE) return;
+                    let cardClass = 'card-normal';
+                    if (idx === 0) cardClass = 'card-gold';
+                    else if (idx === 1) cardClass = 'card-silver';
+                    else if (idx === 2) cardClass = 'card-bronze';
+                    else if (idx >= RANK_NORMAL_BOUND) cardClass = 'card-crowded';
+
+                    const card = document.createElement('div');
+                    card.className = `card ${cardClass}`;
+                    card.dataset.postId = post.id;
+                    const commentCount = (post.comments && post.comments[0]) ? post.comments[0].count : 0;
+                    card.innerHTML = `
+                        <div class="content">${escapeHtml(post.content)}</div>
+                        <div class="card-sign">${escapeHtml(post.signature || '匿名')}</div>
+                        <div class="vote-row">
+                            <div class="vote-btn">👍 ${post.upvotes || 0}</div>
+                            <div class="vote-btn">👎 ${post.downvotes || 0}</div>
+                            <div class="vote-btn reply-btn">💬 回复 (${commentCount})</div>
+                        </div>
+                        <div class="comment-wrap">
+                            <div class="comment-list"></div>
+                            <div class="comment-input-row">
+                                <input type="text" placeholder="写下你的看法（6-60字）" class="comment-input">
+                                <button class="comment-submit">发送</button>
+                            </div>
+                        </div>
+                    `;
+                    rankList.appendChild(card);
+                });
+
+                // 评论展开
+                document.querySelectorAll('.reply-btn').forEach(btn => {
+                    btn.onclick = function() {
+                        const wrap = this.closest('.card').querySelector('.comment-wrap');
+                        wrap.classList.toggle('show');
+                        if (wrap.classList.contains('show')) loadComments(this.closest('.card').dataset.postId);
+                    };
+                });
+                // 点赞点踩
+                document.querySelectorAll('.vote-btn').forEach(btn => {
+                    if (btn.classList.contains('reply-btn')) return;
+                    btn.onclick = async function() {
+                        const postId = this.closest('.card').dataset.postId;
+                        const type = this.textContent.includes('👍') ? 'up' : 'down';
+                        const field = type === 'up' ? 'upvotes' : 'downvotes';
+                        const { data: curr } = await supabase.from('posts').select(field).eq('id', postId).single();
+                        const newVal = (curr[field] || 0) + 1;
+                        await supabase.from('posts').update({ [field]: newVal }).eq('id', postId);
+                        loadPosts();
+                    };
+                });
+            }
+
+            async function loadComments(postId) {
+                const commentList = document.querySelector(`.card[data-post-id="${postId}"] .comment-list`);
+                commentList.innerHTML = '<div style="text-align:center;padding:10px;">加载中...</div>';
+                const { data, error } = await supabase
+                    .from('comments')
+                    .select('*')
+                    .eq('post_id', postId)
+                    .order('created_at', { ascending: true });
+                if (error) {
+                    commentList.innerHTML = '<div style="text-align:center;padding:10px;">评论加载失败</div>';
+                    return;
+                }
+                commentList.innerHTML = '';
+                data.forEach(comment => {
+                    const item = document.createElement('div');
+                    item.className = `comment-item ${comment.downvotes >= COMMENT_DOWN_HIDE ? 'comment-forbid' : ''}`;
+                    if (comment.downvotes >= COMMENT_DOWN_HIDE) {
+                        item.innerHTML = `有伤天和，被判关小黑屋一万年<div class="comment-vote"><span>👍 ${comment.upvotes||0}</span><span>👎 ${comment.downvotes||0}</span></div>`;
+                    } else {
+                        item.innerHTML = `${escapeHtml(comment.content)}<div class="comment-vote"><span class="comment-upvote" data-comment-id="${comment.id}">👍 ${comment.upvotes||0}</span><span class="comment-downvote" data-comment-id="${comment.id}">👎 ${comment.downvotes||0}</span></div>`;
+                    }
+                    commentList.appendChild(item);
+                });
+
+                const submitBtnEl = document.querySelector(`.card[data-post-id="${postId}"] .comment-submit`);
+                const inputEl = document.querySelector(`.card[data-post-id="${postId}"] .comment-input`);
+                if (submitBtnEl) {
+                    submitBtnEl.onclick = async () => {
+                        const content = inputEl.value.trim();
+                        if (content.length < COMMENT_MIN || content.length > COMMENT_MAX) {
+                            alert(`评论需${COMMENT_MIN}-${COMMENT_MAX}字`);
+                            return;
+                        }
+                        await supabase.from('comments').insert([{ post_id: postId, content, upvotes: 0, downvotes: 0 }]);
+                        inputEl.value = '';
+                        loadComments(postId);
+                    };
+                }
+                document.querySelectorAll('.comment-upvote, .comment-downvote').forEach(span => {
+                    span.onclick = async function() {
+                        const commentId = this.dataset.commentId;
+                        const type = this.classList.contains('comment-upvote') ? 'up' : 'down';
+                        const field = type === 'up' ? 'upvotes' : 'downvotes';
+                        const { data: curr } = await supabase.from('comments').select(field).eq('id', commentId).single();
+                        const newVal = (curr[field] || 0) + 1;
+                        await supabase.from('comments').update({ [field]: newVal }).eq('id', commentId);
+                        loadComments(postId);
+                    };
+                });
+            }
+
+            async function handlePublish() {
+                const content = postText.value.trim();
+                const signature = signText.value.trim() || '匿名';
+                if (content.length < POST_MIN || content.length > POST_MAX) {
+                    alert(`槽点需${POST_MIN}-${POST_MAX}字`);
+                    return;
+                }
+                submitBtn.disabled = true;
+                submitBtn.textContent = '发布中...';
+                // 注意：你的 posts 表有 topic_id 字段，默认0表示“全部”
+                const { error } = await supabase.from('posts').insert([{
+                    content, signature, status: 1, upvotes: 0, downvotes: 0, topic_id: 0
+                }]);
+                if (error) {
+                    alert('发布失败：' + error.message);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '发布上榜';
+                    return;
+                }
+                modal.classList.remove('show');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '发布上榜';
+                loadPosts();
+            }
+
+            function checkCount() {
+                const len = postText.value.length;
+                postCount.innerText = `${len} / ${POST_MAX}（${POST_MIN}-${POST_MAX}字）`;
+                if (len < POST_MIN || len > POST_MAX) {
+                    postCount.classList.add('warn');
+                    submitBtn.disabled = true;
+                } else {
+                    postCount.classList.remove('warn');
+                    submitBtn.disabled = false;
+                }
+            }
+
+            function bindEvents() {
+                openModal.onclick = () => {
+                    modal.classList.add('show');
+                    postText.value = '';
+                    signText.value = '';
+                    checkCount();
                 };
+                closeModal.onclick = () => modal.classList.remove('show');
+                postText.addEventListener('input', checkCount);
+                submitBtn.onclick = handlePublish;
             }
-            // 评论点赞点踩
-            document.querySelectorAll('.comment-upvote, .comment-downvote').forEach(span => {
-                span.onclick = async function() {
-                    const commentId = this.dataset.commentId;
-                    const voteType = this.classList.contains('comment-upvote') ? 'up' : 'down';
-                    const field = voteType === 'up' ? 'upvotes' : 'downvotes';
-                    const { data: curr } = await supabase.from('comments').select(field).eq('id', commentId).single();
-                    const newVal = (curr[field] || 0) + 1;
-                    await supabase.from('comments').update({ [field]: newVal }).eq('id', commentId);
-                    loadComments(postId);
-                };
-            });
-        }
 
-        // 槽点点赞点踩
-        async function votePost(postId, voteType) {
-            const field = voteType === 'up' ? 'upvotes' : 'downvotes';
-            const { data: curr } = await supabase.from('posts').select(field).eq('id', postId).single();
-            const newVal = (curr[field] || 0) + 1;
-            await supabase.from('posts').update({ [field]: newVal }).eq('id', postId);
-            loadPosts(); // 刷新列表
-        }
-
-        // 发布新槽点
-        async function handleSubmitPost() {
-            const content = postText.value.trim();
-            const signature = signText.value.trim() || '匿名';
-            if (content.length < POST_MIN || content.length > POST_MAX) {
-                alert(`槽点需要${POST_MIN}-${POST_MAX}字`);
-                return;
+            function init() {
+                bindEvents();
+                loadPosts();
             }
-            submitPostBtn.disabled = true;
-            submitPostBtn.textContent = '发布中...';
-
-            // 注意：您的表里新增了 topic_id 字段，我们给它默认值 0（表示“全部”分类）
-            const { error } = await supabase
-                .from('posts')
-                .insert([{ content, signature, status: 1, upvotes: 0, downvotes: 0, topic_id: 0 }]);
-
-            if (error) {
-                alert('发布失败，请重试\n' + error.message);
-                submitPostBtn.disabled = false;
-                submitPostBtn.textContent = '发布上榜';
-                return;
-            }
-            modal.classList.remove('show');
-            submitPostBtn.disabled = false;
-            submitPostBtn.textContent = '发布上榜';
-            loadPosts();
-        }
-
-        // 绑定事件
-        function bindEvents() {
-            openModal.onclick = () => {
-                modal.classList.add('show');
-                postText.value = '';
-                signText.value = '';
-                checkPostCount();
-            };
-            closeModal.onclick = () => modal.classList.remove('show');
-            postText.addEventListener('input', checkPostCount);
-            submitPostBtn.onclick = handleSubmitPost;
-        }
-
-        // 字数校验
-        function checkPostCount() {
-            const len = postText.value.length;
-            postCount.innerText = `${len} / ${POST_MAX}（${POST_MIN}-${POST_MAX}字）`;
-            if (len < POST_MIN || len > POST_MAX) {
-                postCount.classList.add('warn');
-                submitPostBtn.disabled = true;
-            } else {
-                postCount.classList.remove('warn');
-                submitPostBtn.disabled = false;
-            }
-        }
-
-        // 防XSS
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+            init();
+        })();
     </script>
 </body>
 </html>
