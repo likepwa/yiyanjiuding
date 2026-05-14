@@ -81,16 +81,20 @@
         </div>
     </div>
     <script>
-        // ===================== 请替换成你自己的 Supabase 信息 =====================
+        // ========== 请替换成你自己的 Supabase 配置 ==========
         const SUPABASE_URL = 'https://hlkudwvzrkmdkidxuia.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_L2oaE67FWmUre9aVSOydnQ_gaSragbT';
-        // =========================================================================
+        // =================================================
 
+        // 只声明一次 supabase 客户端
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const POST_MIN = 15, POST_MAX = 120, COMMENT_MIN = 6, COMMENT_MAX = 60;
+        // 从系统配置读取阈值（也可以直接使用默认值）
+        const POST_MIN = 15, POST_MAX = 120;
+        const COMMENT_MIN = 6, COMMENT_MAX = 60;
         const POST_DOWN_HIDE = 30, COMMENT_DOWN_HIDE = 20, RANK_NORMAL_BOUND = 50;
 
+        // DOM 元素
         const modal = document.getElementById('modal');
         const openModal = document.getElementById('openModal');
         const closeModal = document.getElementById('closeModal');
@@ -100,24 +104,57 @@
         const submitPostBtn = document.getElementById('submitPostBtn');
         const rankList = document.getElementById('rankList');
 
+        // 页面初始化
         init();
 
-        function init() { loadPosts(); bindEvents(); }
+        function init() {
+            loadPosts();
+            bindEvents();
+        }
 
+        // 加载槽点列表
         async function loadPosts() {
-            const { data, error } = await supabase.from('posts').select('*, comments(count)').eq('status',1).order('upvotes',{ascending:false}).limit(100);
-            if (error) { rankList.innerHTML = '<div class="loading">加载失败，请刷新重试</div>'; return; }
+            const { data, error } = await supabase
+                .from('posts')
+                .select('*, comments(count)')
+                .eq('status', 1)
+                .order('upvotes', { ascending: false })
+                .limit(100);
+
+            if (error) {
+                rankList.innerHTML = '<div class="loading">加载失败，请刷新重试</div>';
+                console.error('加载失败:', error);
+                return;
+            }
+
             rankList.innerHTML = '';
             data.forEach((post, index) => {
                 if (post.downvotes >= POST_DOWN_HIDE) return;
-                const cardClass = index===0 ? 'card-gold' : index===1 ? 'card-silver' : index===2 ? 'card-bronze' : (index<RANK_NORMAL_BOUND ? 'card-normal' : 'card-crowded');
+                const cardClass = index===0 ? 'card-gold' : index===1 ? 'card-silver' : index===2 ? 'card-bronze' : (index < RANK_NORMAL_BOUND ? 'card-normal' : 'card-crowded');
                 const card = document.createElement('div');
                 card.className = `card ${cardClass}`;
                 card.dataset.postId = post.id;
                 const commentCount = (post.comments && post.comments[0]) ? post.comments[0].count : 0;
-                card.innerHTML = `<div class="content">${escapeHtml(post.content)}</div><div class="card-sign">${escapeHtml(post.signature||'匿名')}</div><div class="vote-row"><div class="vote-btn">👍 ${post.upvotes||0}</div><div class="vote-btn">👎 ${post.downvotes||0}</div><div class="vote-btn reply-btn">💬 回复 (${commentCount})</div></div><div class="comment-wrap"><div class="comment-list"></div><div class="comment-input-row"><input type="text" placeholder="写下你的看法（6-60字）" class="comment-input"><button class="comment-submit">发送</button></div></div>`;
+                card.innerHTML = `
+                    <div class="content">${escapeHtml(post.content)}</div>
+                    <div class="card-sign">${escapeHtml(post.signature || '匿名')}</div>
+                    <div class="vote-row">
+                        <div class="vote-btn">👍 ${post.upvotes || 0}</div>
+                        <div class="vote-btn">👎 ${post.downvotes || 0}</div>
+                        <div class="vote-btn reply-btn">💬 回复 (${commentCount})</div>
+                    </div>
+                    <div class="comment-wrap">
+                        <div class="comment-list"></div>
+                        <div class="comment-input-row">
+                            <input type="text" placeholder="写下你的看法（6-60字）" class="comment-input">
+                            <button class="comment-submit">发送</button>
+                        </div>
+                    </div>
+                `;
                 rankList.appendChild(card);
             });
+
+            // 绑定评论展开事件
             document.querySelectorAll('.reply-btn').forEach(btn => {
                 btn.onclick = function() {
                     const wrap = this.closest('.card').querySelector('.comment-wrap');
@@ -125,6 +162,7 @@
                     if (wrap.classList.contains('show')) loadComments(this.closest('.card').dataset.postId);
                 };
             });
+            // 绑定点赞点踩事件
             document.querySelectorAll('.vote-btn').forEach(btn => {
                 if (btn.classList.contains('reply-btn')) return;
                 btn.onclick = async function() {
@@ -135,33 +173,43 @@
             });
         }
 
+        // 加载评论
         async function loadComments(postId) {
             const commentList = document.querySelector(`.card[data-post-id="${postId}"] .comment-list`);
             commentList.innerHTML = '<div style="text-align:center;padding:10px;color:#8a8e9b;">加载中...</div>';
-            const { data, error } = await supabase.from('comments').select('*').eq('post_id', postId).order('created_at',{ascending:true});
-            if (error) { commentList.innerHTML = '<div style="text-align:center;padding:10px;color:#8a8e9b;">评论加载失败</div>'; return; }
+            const { data, error } = await supabase
+                .from('comments')
+                .select('*')
+                .eq('post_id', postId)
+                .order('created_at', { ascending: true });
+            if (error) {
+                commentList.innerHTML = '<div style="text-align:center;padding:10px;color:#8a8e9b;">评论加载失败</div>';
+                return;
+            }
             commentList.innerHTML = '';
             data.forEach(comment => {
                 const commentItem = document.createElement('div');
                 commentItem.className = `comment-item ${comment.downvotes >= COMMENT_DOWN_HIDE ? 'comment-forbid' : ''}`;
                 if (comment.downvotes >= COMMENT_DOWN_HIDE) {
-                    commentItem.innerHTML = `有伤天和，被判关小黑屋一万年<div class="comment-vote"><span>👍 ${comment.upvotes||0}</span><span>👎 ${comment.downvotes||0}</span></div>`;
+                    commentItem.innerHTML = `有伤天和，被判关小黑屋一万年<div class="comment-vote"><span>👍 ${comment.upvotes || 0}</span><span>👎 ${comment.downvotes || 0}</span></div>`;
                 } else {
-                    commentItem.innerHTML = `${escapeHtml(comment.content)}<div class="comment-vote"><span class="comment-upvote" data-comment-id="${comment.id}">👍 ${comment.upvotes||0}</span><span class="comment-downvote" data-comment-id="${comment.id}">👎 ${comment.downvotes||0}</span></div>`;
+                    commentItem.innerHTML = `${escapeHtml(comment.content)}<div class="comment-vote"><span class="comment-upvote" data-comment-id="${comment.id}">👍 ${comment.upvotes || 0}</span><span class="comment-downvote" data-comment-id="${comment.id}">👎 ${comment.downvotes || 0}</span></div>`;
                 }
                 commentList.appendChild(commentItem);
             });
+            // 提交评论
             const submitBtn = document.querySelector(`.card[data-post-id="${postId}"] .comment-submit`);
             const input = document.querySelector(`.card[data-post-id="${postId}"] .comment-input`);
             if (submitBtn) {
                 submitBtn.onclick = async () => {
                     const content = input.value.trim();
                     if (content.length < COMMENT_MIN || content.length > COMMENT_MAX) { alert(`评论需要${COMMENT_MIN}-${COMMENT_MAX}字`); return; }
-                    await supabase.from('comments').insert([{ post_id: postId, content, upvotes:0, downvotes:0 }]);
+                    await supabase.from('comments').insert([{ post_id: postId, content, upvotes: 0, downvotes: 0 }]);
                     input.value = '';
                     loadComments(postId);
                 };
             }
+            // 评论点赞点踩
             document.querySelectorAll('.comment-upvote, .comment-downvote').forEach(span => {
                 span.onclick = async function() {
                     const commentId = this.dataset.commentId;
@@ -175,43 +223,76 @@
             });
         }
 
+        // 槽点点赞点踩
         async function votePost(postId, voteType) {
             const field = voteType === 'up' ? 'upvotes' : 'downvotes';
             const { data: curr } = await supabase.from('posts').select(field).eq('id', postId).single();
             const newVal = (curr[field] || 0) + 1;
             await supabase.from('posts').update({ [field]: newVal }).eq('id', postId);
-            loadPosts();
+            loadPosts(); // 刷新列表
         }
 
+        // 发布新槽点
         async function handleSubmitPost() {
             const content = postText.value.trim();
             const signature = signText.value.trim() || '匿名';
-            if (content.length < POST_MIN || content.length > POST_MAX) { alert(`槽点需要${POST_MIN}-${POST_MAX}字`); return; }
+            if (content.length < POST_MIN || content.length > POST_MAX) {
+                alert(`槽点需要${POST_MIN}-${POST_MAX}字`);
+                return;
+            }
             submitPostBtn.disabled = true;
             submitPostBtn.textContent = '发布中...';
-            const { error } = await supabase.from('posts').insert([{ content, signature, status:1, upvotes:0, downvotes:0 }]);
-            if (error) { alert('发布失败，请重试'); submitPostBtn.disabled = false; submitPostBtn.textContent = '发布上榜'; return; }
+
+            // 注意：您的表里新增了 topic_id 字段，我们给它默认值 0（表示“全部”分类）
+            const { error } = await supabase
+                .from('posts')
+                .insert([{ content, signature, status: 1, upvotes: 0, downvotes: 0, topic_id: 0 }]);
+
+            if (error) {
+                alert('发布失败，请重试\n' + error.message);
+                submitPostBtn.disabled = false;
+                submitPostBtn.textContent = '发布上榜';
+                return;
+            }
             modal.classList.remove('show');
             submitPostBtn.disabled = false;
             submitPostBtn.textContent = '发布上榜';
             loadPosts();
         }
 
+        // 绑定事件
         function bindEvents() {
-            openModal.onclick = () => { modal.classList.add('show'); postText.value = ''; signText.value = ''; checkPostCount(); };
-            closeModal.onclick = () => { modal.classList.remove('show'); };
+            openModal.onclick = () => {
+                modal.classList.add('show');
+                postText.value = '';
+                signText.value = '';
+                checkPostCount();
+            };
+            closeModal.onclick = () => modal.classList.remove('show');
             postText.addEventListener('input', checkPostCount);
             submitPostBtn.onclick = handleSubmitPost;
         }
 
+        // 字数校验
         function checkPostCount() {
             const len = postText.value.length;
             postCount.innerText = `${len} / ${POST_MAX}（${POST_MIN}-${POST_MAX}字）`;
-            if (len < POST_MIN || len > POST_MAX) { postCount.classList.add('warn'); submitPostBtn.disabled = true; }
-            else { postCount.classList.remove('warn'); submitPostBtn.disabled = false; }
+            if (len < POST_MIN || len > POST_MAX) {
+                postCount.classList.add('warn');
+                submitPostBtn.disabled = true;
+            } else {
+                postCount.classList.remove('warn');
+                submitPostBtn.disabled = false;
+            }
         }
 
-        function escapeHtml(text) { if(!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+        // 防XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>
