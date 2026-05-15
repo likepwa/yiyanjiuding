@@ -114,14 +114,12 @@
             display: flex;
             min-height: calc(100vh - 60px);
         }
-        .sidebar {
+        .sidebar-menu {
+            list-style: none;
             width: 200px;
             background: rgba(255,255,255,0.03);
             border-right: 1px solid rgba(255,255,255,0.1);
             padding: 20px 0;
-        }
-        .sidebar-menu {
-            list-style: none;
         }
         .sidebar-menu li {
             padding: 12px 20px;
@@ -333,7 +331,7 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_L2oaE67FWmUre9aVSOydnQ_gaSragbT';
         // =================================================================================
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 页面初始化
         init();
@@ -556,7 +554,7 @@
                 .select('*')
                 .order('sort');
 
-            if (error || data.length === 0) {
+            if (error || !data || data.length === 0) {
                 document.getElementById('topicsList').innerHTML = '<tr><td colspan="4" class="empty-tip">暂无分类数据</td></tr>';
             } else {
                 const topicsList = document.getElementById('topicsList');
@@ -574,7 +572,7 @@
                 });
 
                 // 绑定保存事件
-                document.querySelectorAll('.config-input').forEach(input => {
+                document.querySelectorAll('#topicsList .config-input').forEach(input => {
                     input.onblur = async function() {
                         const id = this.dataset.id;
                         const field = this.dataset.field;
@@ -587,7 +585,7 @@
                 });
 
                 // 绑定删除事件
-                document.querySelectorAll('.btn-delete').forEach(btn => {
+                document.querySelectorAll('#topicsList .btn-delete').forEach(btn => {
                     btn.onclick = async function() {
                         if (!confirm('确定要删除这个分类吗？')) return;
                         await supabase
@@ -621,7 +619,7 @@
                 .order('created_at', { ascending: false })
                 .limit(100);
 
-            if (error || data.length === 0) {
+            if (error || !data || data.length === 0) {
                 document.getElementById('postsList').innerHTML = '<tr><td colspan="7" class="empty-tip">暂无槽点数据</td></tr>';
                 return;
             }
@@ -647,7 +645,7 @@
             });
 
             // 绑定操作事件
-            document.querySelectorAll('.btn-hide, .btn-show').forEach(btn => {
+            document.querySelectorAll('#postsList .btn-hide, #postsList .btn-show').forEach(btn => {
                 btn.onclick = async function() {
                     const postId = this.dataset.id;
                     const newStatus = this.classList.contains('btn-hide') ? 2 : 1;
@@ -659,7 +657,7 @@
                 };
             });
 
-            document.querySelectorAll('.btn-delete').forEach(btn => {
+            document.querySelectorAll('#postsList .btn-delete').forEach(btn => {
                 btn.onclick = async function() {
                     if (!confirm('确定要删除这条槽点吗？')) return;
                     await supabase
@@ -682,7 +680,7 @@
                 .order('created_at', { ascending: false })
                 .limit(100);
 
-            if (error || data.length === 0) {
+            if (error || !data || data.length === 0) {
                 document.getElementById('commentsList').innerHTML = '<tr><td colspan="6" class="empty-tip">暂无评论数据</td></tr>';
                 return;
             }
@@ -704,7 +702,7 @@
             });
 
             // 绑定删除事件
-            document.querySelectorAll('.btn-delete').forEach(btn => {
+            document.querySelectorAll('#commentsList .btn-delete').forEach(btn => {
                 btn.onclick = async function() {
                     if (!confirm('确定要删除这条评论吗？')) return;
                     await supabase
@@ -717,7 +715,7 @@
         }
 
         // 加载举报管理页面
-        function loadReportsPage() {
+        async function loadReportsPage() {
             const mainContent = document.getElementById('mainContent');
             mainContent.innerHTML = '<div class="page-title">举报管理</div><div class="card"><div class="empty-tip">举报功能暂未开启，在「功能开关」中开启后即可使用</div></div>';
         }
